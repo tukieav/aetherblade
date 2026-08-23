@@ -1,0 +1,16 @@
+import {chromium} from 'playwright';
+import {server,chrome} from './helpers.mjs';
+import assert from 'node:assert/strict';
+const s=await server();
+const browser=await chromium.launch({executablePath:chrome,headless:true,args:['--no-sandbox','--disable-dev-shm-usage','--use-gl=swiftshader']});
+const page=await browser.newPage({viewport:{width:907,height:510}}),errors=[];
+page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});page.on('pageerror',e=>errors.push(e.message));
+await page.goto('http://localhost:8701/?debug=1');
+try{await page.waitForFunction(()=>window.__astro,{timeout:5000})}catch{throw new Error('Game did not boot: '+errors.join(' | '))}
+await page.screenshot({path:'qa/screenshots/tutorial-907.png'});
+const before=await page.evaluate(()=>__astro.getState().pos.z);await page.locator('#game').click();await page.waitForTimeout(40);assert(await page.evaluate(()=>document.pointerLockElement===document.querySelector('#game')),'pointer lock after click');await page.keyboard.down('z');await page.waitForTimeout(450);await page.keyboard.up('z');const after=await page.evaluate(()=>__astro.getState().pos.z);assert.notEqual(before,after,'AZERTY z / event.code movement changes position');
+await page.keyboard.press('Space');await page.waitForTimeout(50);assert((await page.evaluate(()=>__astro.getState().pos.y))>0,'jump rises');
+await page.keyboard.press('KeyI');assert(await page.locator('#inventory').evaluate(e=>e.classList.contains('open')),'inventory opens');await page.screenshot({path:'qa/screenshots/inventory-907.png'});await page.locator('#invClose').click();
+await page.evaluate(()=>__astro.teleport(-8,-34));await page.locator('#game').click();await page.waitForTimeout(50);await page.mouse.click(450,255);await page.waitForTimeout(180);assert((await page.evaluate(()=>__astro.getState().mobs[0].hp))<36,'sword hit damages mob');await page.screenshot({path:'qa/screenshots/combat-907.png'});const itemCount=await page.evaluate(()=>__astro.getState().inventory.length);await page.evaluate(()=>__astro.killMob(0));await page.keyboard.press('KeyE');await page.waitForTimeout(80);assert((await page.evaluate(()=>__astro.getState().inventory.length))>itemCount,'loot pickup');
+await page.evaluate(()=>{for(let i=0;i<8;i++)__astro.completeTutorialStep()});assert((await page.evaluate(()=>__astro.getState().tutorialStep))>=8,'tutorial debug steps transition');await page.evaluate(()=>localStorage.setItem('aetherblade.save',JSON.stringify({level:3,xp:12,inventory:['potion'],equipped:'ironSword',tutorialStep:8})));await page.reload();await page.waitForFunction(()=>window.__astro);assert.equal(await page.evaluate(()=>__astro.getState().level),3,'save/load level');
+const pixels=await page.screenshot();assert(pixels.length>1000,'canvas screenshot non-empty');assert.equal(errors.length,0,`console errors: ${errors}`);await page.screenshot({path:'qa/screenshots/e2e-907.png'});await browser.close();await new Promise(r=>s.close(r));console.log('e2e passed');
