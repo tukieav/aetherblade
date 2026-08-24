@@ -146,3 +146,10 @@ All tests ran against `dist` on the isolated local port `8701`, using `/usr/bin/
 
 ### Regression
 - `npm run build` → exit 0; `node tests/e2e.mjs` → exit 0; `node tests/viewport.mjs` → exit 0; `node tests/soak.mjs` → exit 0. (Game-logic change limited to capture-only debug hooks + camPose short-circuit in updateCamera, inert unless setCameraPose is called.)
+
+## Polish pass (2026-08-24)
+- Fix: exact ground snap each grounded frame (walk/dash/knockback); grass 0.84m + sparse village zone.
+- Fix: XP legibility — curve 60/80/l*100, +XP floats, XP tooltip, no-quest hint, golden level-up banner. e2e: 2 slimes -> level 2.
+- Fix: attack overhaul — real KayKit clips (Chop/Slice/2H Spin), no manual sword override, 0.4m lunge, FOV punch, additive blade trail (0.22/0.3s), enemy white flash. playerAction exposed.
+- Art: KayKit Medieval Hexagon (homes, market, fence, trees, rocks) + Quaternius animated wolf — all CC0, instanced, try/catch fallbacks, propsLoaded flags. dist 16MB.
+- Gates: build 0, e2e 0, viewport 0, soak 0 (>=30fps).

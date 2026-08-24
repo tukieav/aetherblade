@@ -9,13 +9,21 @@ await page.goto('http://localhost:8701/?debug=1&capture=1');
 try{await page.waitForFunction(()=>window.__astro,{timeout:5000})}catch{throw new Error('Game did not boot: '+errors.join(' | '))}
 await page.waitForFunction(()=>__astro.getState().characterClips.knight?.length>0,{timeout:8000});
 assert((await page.evaluate(()=>__astro.getState().characterClips.knight.length))>=8,'KayKit knight animations load');
+// Polish pass: CC0 props loaded + animated player action exposed + 60 XP first-level curve
+await page.waitForFunction(()=>{const p=__astro.getState().propsLoaded;return p&&p.trees&&p.rocks&&p.buildings&&p.fence&&p.wolf},{timeout:8000});
+assert.deepEqual(await page.evaluate(()=>__astro.getState().propsLoaded),{trees:true,rocks:true,buildings:true,fence:true,wolf:true},'loadProps replaced trees/rocks/buildings/fence/wolf');
+assert.equal(typeof await page.evaluate(()=>__astro.getState().playerAction),'string','playerAction clip name exposed');
+assert.equal(await page.evaluate(()=>__astro.getState().xpNeed),60,'level 1 needs 60 XP (2 slimes -> level 2)');
+const lvl2=await page.evaluate(()=>{const p=__astro.getState().pos;for(let k=0;k<2;k++){const i=__astro.spawnMobAt('Slime',p.x+2,p.z+2);__astro.killMob(i)}return __astro.getState().level});
+assert.equal(lvl2,2,'two slime kills (70 XP) reach level 2');
+await page.evaluate(()=>{localStorage.clear();window.__skipUnloadSave=true});await page.reload();await page.waitForFunction(()=>window.__astro,{timeout:8000});await page.waitForFunction(()=>__astro.getState().characterClips.knight?.length>0,{timeout:8000});await page.evaluate(()=>{window.__skipUnloadSave=false});
 await page.screenshot({path:'qa/screenshots/tutorial-907.png'});
 await page.screenshot({path:'qa/screenshots/village-golden-hour.png'});
 const before=await page.evaluate(()=>__astro.getState().pos.z);await page.locator('#game').click();await page.waitForTimeout(40);assert(await page.evaluate(()=>document.pointerLockElement===document.querySelector('#game')),'pointer lock after click');await page.keyboard.down('z');await page.waitForTimeout(450);await page.keyboard.up('z');const after=await page.evaluate(()=>__astro.getState().pos.z);assert.notEqual(before,after,'AZERTY z / event.code movement changes position');
 await page.keyboard.press('Space');await page.waitForTimeout(50);assert((await page.evaluate(()=>__astro.getState().pos.y))>0,'jump rises');
 await page.keyboard.press('KeyI');assert(await page.locator('#inventory').evaluate(e=>e.classList.contains('open')),'inventory opens');await page.screenshot({path:'qa/screenshots/inventory-907.png'});await page.locator('#invClose').click();
 await page.evaluate(()=>__astro.teleport(-8,-42));await page.waitForTimeout(180);const labelProjection=await page.evaluate(()=>{const mob=__astro.getState().mobs[1],label=document.querySelectorAll('.nameplate')[1].getBoundingClientRect(),canvas=document.querySelector('#game').getBoundingClientRect(),labelCenter={x:label.left+label.width/2,y:label.top+label.height/2},playerCenter={x:canvas.left+canvas.width/2,y:canvas.top+canvas.height/2};return {visible:mob.screen.visible,labelDistance:Math.hypot(labelCenter.x-mob.screen.x,labelCenter.y-mob.screen.y),playerDistance:Math.hypot(labelCenter.x-playerCenter.x,labelCenter.y-playerCenter.y)}});assert(labelProjection.visible,'mob label target is on-screen');assert(labelProjection.labelDistance<80,`mob label tracks its projected position (${labelProjection.labelDistance}px)`);assert(labelProjection.playerDistance>120,`mob label is not attached to player (${labelProjection.playerDistance}px)`);
-await page.evaluate(()=>__astro.teleport(-8,-34));await page.locator('#game').click();await page.waitForTimeout(50);await page.mouse.click(450,255);await page.waitForTimeout(180);assert((await page.evaluate(()=>__astro.getState().mobs[0].hp))<36,'sword hit damages mob');await page.screenshot({path:'qa/screenshots/combat-907.png'});const pickBefore=await page.evaluate(()=>{const s=__astro.getState();return {inv:s.inventory.length,gold:s.gold}});await page.evaluate(()=>__astro.killMob(0));await page.keyboard.press('KeyE');await page.waitForTimeout(80);const pickAfter=await page.evaluate(()=>{const s=__astro.getState();return {inv:s.inventory.length,gold:s.gold}});assert(pickAfter.inv>pickBefore.inv||pickAfter.gold>pickBefore.gold,'loot pickup adds item or gold');
+await page.evaluate(()=>__astro.teleport(-8,-36.5));await page.locator('#game').click();await page.waitForTimeout(50);await page.mouse.click(450,255);await page.waitForTimeout(180);assert((await page.evaluate(()=>__astro.getState().mobs[0].hp))<36,'sword hit damages mob');await page.screenshot({path:'qa/screenshots/combat-907.png'});const pickBefore=await page.evaluate(()=>{const s=__astro.getState();return {inv:s.inventory.length,gold:s.gold}});await page.evaluate(()=>__astro.killMob(0));await page.keyboard.press('KeyE');await page.waitForTimeout(80);const pickAfter=await page.evaluate(()=>{const s=__astro.getState();return {inv:s.inventory.length,gold:s.gold}});assert(pickAfter.inv>pickBefore.inv||pickAfter.gold>pickBefore.gold,'loot pickup adds item or gold');
 await page.evaluate(()=>__astro.teleport(19,-38));await page.waitForTimeout(120);await page.screenshot({path:'qa/screenshots/mob-fight-wolf.png'});
 // M2 — dash: distance + i-frames + cooldown
 await page.evaluate(()=>__astro.teleport(55,40));await page.waitForFunction(()=>__astro.getState().stamina>=45,{timeout:15000});
@@ -131,7 +139,8 @@ await p5.waitForFunction(()=>window.__astro,{timeout:8000});
 await p5.waitForFunction(()=>__astro.getState().characterClips.knight?.length>0,{timeout:8000});
 // loading order: SDK init ran, loadingStart before loadingStop, both fired once
 const loadC=await p5.evaluate(()=>window.__cg);
-assert.equal(loadC.loadStart,1,'loadingStart called once after initSDK');assert.equal(loadC.loadStop,1,'loadingStop called when world ready');
+await p5.waitForFunction(()=>window.__cg.loadStop>=1,{timeout:10000});// loadingStop now fires after loadCharacters+loadProps
+assert.equal(loadC.loadStart,1,'loadingStart called once after initSDK');assert.equal(await p5.evaluate(()=>window.__cg.loadStop),1,'loadingStop called when world ready');
 // -- BUGFIX 1: mouse-look direction — positive movementX increases yaw (orbits right)
 await p5.locator('#game').click();await p5.waitForTimeout(120);
 assert(await p5.evaluate(()=>document.pointerLockElement===document.querySelector('#game')),'pointer lock acquired (stub page)');
@@ -199,7 +208,7 @@ const aState=await p5.evaluate(()=>__astro.audioState());
 assert.equal(aState.ambient,'vale',`ambient layer tracks map (${aState.ambient})`);assert(aState.started,'audio scape started after pointer lock');
 // -- gameplayStop on pointer lock loss
 const gpBefore=await p5.evaluate(()=>window.__cg.gpStop);
-await p5.evaluate(()=>__astro.simulatePointerLockLoss());await p5.waitForTimeout(1300);
+await p5.evaluate(()=>__astro.simulatePointerLockLoss());await p5.waitForFunction(g=>window.__cg.gpStop>g,gpBefore,{timeout:6000});// gameplayStop is 1.1s-throttled; loadProps shifts the call chain, so wait instead of a fixed sleep
 assert((await p5.evaluate(()=>window.__cg.gpStop))>gpBefore,'gameplayStop fires on pointer lock loss');
 // drain any deferred (1.1s-throttled) gameplay calls so the panel check below is clean
 let gpDrain=await p5.evaluate(()=>window.__cg.gpStop+window.__cg.gpStart),stable=0;
