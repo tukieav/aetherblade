@@ -153,3 +153,11 @@ All tests ran against `dist` on the isolated local port `8701`, using `/usr/bin/
 - Fix: attack overhaul — real KayKit clips (Chop/Slice/2H Spin), no manual sword override, 0.4m lunge, FOV punch, additive blade trail (0.22/0.3s), enemy white flash. playerAction exposed.
 - Art: KayKit Medieval Hexagon (homes, market, fence, trees, rocks) + Quaternius animated wolf — all CC0, instanced, try/catch fallbacks, propsLoaded flags. dist 16MB.
 - Gates: build 0, e2e 0, viewport 0, soak 0 (>=30fps).
+
+## Roster unification (2026-08-24)
+- Research: KayKit family (CC0) has NO beast mobs (Dungeon/Halloween = props only). Humanoids from KayKit; beasts restyled to match.
+- Merchant Odessa -> KayKit Adventurers Rogue.glb (optimized 3.6->2.7MB, baked weapons hidden).
+- Wolf/Alpha Wolf -> Quaternius model restyled runtime: flatShading, KayKit tan palette, chunkier scale.
+- Slime/Cave Bat/Crystal Golem/Deepstone Colossus -> rebuilt faceted (icosahedron/dodecahedron), KayKit palette, emissive crystal veins; colossus 2.6x + purple spikes.
+- Dynamic skeleton spawns now use KayKit model (cache fix).
+- Consistency gate: roster-lineup.png + roster-cave.png verified — one style family. dist 19MB. Gates: build 0, e2e 0, viewport 0, soak 0.
