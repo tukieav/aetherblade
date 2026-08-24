@@ -82,11 +82,18 @@ assert((await page.evaluate(()=>__astro.getState().loot)).some(l=>l.id==='crysta
 await page.evaluate(()=>{__astro.setQuest(7);for(let k=0;k<2;k++){const i=__astro.getState().mobs.findIndex(m=>m.type==='Crystal Golem'&&!m.dead);if(i>=0)__astro.killMob(i);else{const j=__astro.spawnMobAt('Crystal Golem',__astro.getState().pos.x+3,__astro.getState().pos.z+3);__astro.killMob(j)}}});
 assert((await page.evaluate(()=>__astro.getState().quest)).done,'Crystal Hunter quest completes on 2 golem kills');
 // colossus telegraph appears when close
-await page.evaluate(()=>{const s=__astro.getState();__astro.teleport(0,-37)});
+await page.waitForTimeout(2100);// let quest-complete toast fade before boss beauty shot
+await page.evaluate(()=>{const s=__astro.getState();__astro.teleport(0,-33)});
 await page.waitForFunction(()=>__astro.getState().caveBoss.telegraph!==null,{timeout:8000});
 const cb=await page.evaluate(()=>{const s=__astro.getState();return {tele:s.caveBoss.telegraph,fields:s.telegraphs}});
 assert(['smash','throw'].includes(cb.tele),`colossus telegraphs (${cb.tele})`);assert(cb.fields>=1,'telegraph field mesh present');
+const bossScreen=await page.evaluate(()=>__astro.getState().mobs.find(m=>m.type==='Deepstone Colossus').screen);
 await page.screenshot({path:'qa/screenshots/cave-boss-907.png'});
+// boss visibility: sample mean luminance in a 60px box around the boss's projected screen position
+const shotB64=(await page.screenshot()).toString('base64');
+const lum=await page.evaluate(async ({b64,sx,sy})=>{const img=new Image();img.src='data:image/png;base64,'+b64;await img.decode();const c=document.createElement('canvas');c.width=img.width;c.height=img.height;const g=c.getContext('2d');g.drawImage(img,0,0);const d=g.getImageData(Math.max(0,sx-30),Math.max(0,sy-10),60,80).data;let s=0;for(let i=0;i<d.length;i+=4)s+=.2126*d[i]+.7152*d[i+1]+.0722*d[i+2];return s/(d.length/4)},{b64:shotB64,sx:Math.round(bossScreen.x),sy:Math.round(bossScreen.y)});
+assert(bossScreen.visible,'colossus is on-screen in boss shot');assert(lum>28,`colossus region luminance readable (${lum.toFixed(1)})`);
+console.log(`boss-shot luminance @(${Math.round(bossScreen.x)},${Math.round(bossScreen.y)}) = ${lum.toFixed(1)}`);
 // colossus kill: 300 XP path, Colossus Core + Runic Greatsword drops, endgame modal
 await page.evaluate(()=>{__astro.setQuest(8);const i=__astro.getState().mobs.findIndex(m=>m.type==='Deepstone Colossus');__astro.killMob(i)});
 const post=await page.evaluate(()=>{const s=__astro.getState();return {dead:s.caveBoss.dead,loot:s.loot.map(l=>l.id),quest:s.quest}});

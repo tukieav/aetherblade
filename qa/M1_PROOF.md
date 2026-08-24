@@ -107,3 +107,12 @@ All tests ran against `dist` on the isolated local port `8701`, using `/usr/bin/
 
 - [Inside the Hollow Depths — crystals, mushrooms, torch light — 907×510](screenshots/cave-907.png)
 - [Deepstone Colossus + boss bar + crystal cavern — 907×510](screenshots/cave-boss-907.png)
+
+## M4.1 — Cave readability pass
+
+- **Cave lighting**: hemisphere raised (0.28 → 0.95, cool blue-grey `#4a5d85`/`#1a2233`), fog pushed out (18–72), background lifted to `#0a1020` — floor/walls/stalagmites now read as dark blue-grey silhouettes instead of pure black. Player torch radius widened 2.5× (20 → 50, decay 2 → 1.5, intensity 13) with gentle falloff.
+- **Light budget kept at 6 cave point lights** (torch, player fill, 3 crystal cluster lights, boss-chamber moonwell); the other 3 crystal clusters + moonwell floor now use **additive-blend emissive glow discs** that fake bounce light on the floor. Campfire light disabled while in cave. Soak stayed ≥30fps.
+- **Boss visibility**: large cool "moonwell" point light (intensity 14, range 48) over the boss chamber at (0,−42) + boosted emissive crystal veins on the Colossus body (emissiveIntensity 1.6). Rock-throw shadow telegraph recolored `#222833` → `#5a6f9e` and telegraph pulse floor opacity raised .25 → .45 so AoE ring/shadow read on the dark floor. Verified in e2e via **pixel luminance sample: mean luminance 108.2 in a 60×80px box around the boss's projected screen position** (asserted > 28) in `cave-boss-907.png`.
+- **Lingering "Quest complete: Crystal Hunter!" text**: this was the HUD `#toast` element — `toast()` scheduled a fixed fade but repeated toasts raced older timeouts (a later `setTimeout` from an earlier toast could be pre-empted, leaving text at opacity 1). Fixed: `toast()` now clears/re-arms a single tracked timeout (fades ≤1.8s < 4s), and `setMap()` force-hides the toast so it never survives map swaps.
+- **Player readability in TPP**: small cool fill point light (`#7fa0d8`, intensity 3, range 9) follows behind the player in cave so the knight reads from the camera side.
+- Re-verified sequentially: `npm run build` ✓, `node tests/e2e.mjs` ✓ (incl. new boss-luminance assertion), `node tests/viewport.mjs` ✓, `node tests/soak.mjs` ✓ (≥30fps). Screenshots `cave-907.png` and `cave-boss-907.png` regenerated with `?debug=1&capture=1`.
