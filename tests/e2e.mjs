@@ -65,4 +65,41 @@ await page.screenshot({path:'qa/screenshots/quest-hud-907.png'});
 await page.reload();await page.waitForFunction(()=>window.__astro);
 const persisted=await page.evaluate(()=>{const s=__astro.getState();return {quest:s.quest,gold:s.gold}});
 assert.equal(persisted.quest.id,2,'quest id survives reload');assert.equal(persisted.gold,claim.gold,'gold survives reload');
+// M4 — Hollow Depths: map swap, cave mobs, golem drop, colossus, exit, persistence
+const vale0=await page.evaluate(()=>{const s=__astro.getState();return {map:s.map,visible:s.mobs.filter(m=>m.map==='vale').length,cave:s.mobs.filter(m=>m.map==='cave').length}});
+assert.equal(vale0.map,'vale','starts in vale');assert(vale0.cave>=8,`cave mobs pre-spawned (${vale0.cave})`);
+const gate=await page.evaluate(()=>{__astro.teleport(30,-85);return __astro.enterCave(false)});
+assert.equal(gate,false,'cave entry gated below level 5');
+await page.evaluate(()=>__astro.enterCave());await page.waitForFunction(()=>__astro.getState().map==='cave',{timeout:4000});
+const caveS=await page.evaluate(()=>{const s=__astro.getState();return {map:s.map,bat:s.mobs.find(m=>m.type==='Cave Bat'),golem:s.mobs.find(m=>m.type==='Crystal Golem'&&!m.dead),caveBoss:s.caveBoss,quest:s.quest}});
+assert.equal(caveS.map,'cave','enterCave switches map to cave');
+assert(caveS.bat&&caveS.bat.hp===25,`Cave Bat exists with 25 HP (${caveS.bat?.hp})`);
+assert(caveS.golem&&caveS.golem.hp===120,`Crystal Golem exists with 120 HP (${caveS.golem?.hp})`);
+assert(caveS.caveBoss&&caveS.caveBoss.hp===600&&!caveS.caveBoss.dead,'Deepstone Colossus exists with 600 HP');
+await page.evaluate(()=>{const i=__astro.getState().mobs.findIndex(m=>m.type==='Crystal Golem'&&!m.dead);__astro.killMob(i)});
+assert((await page.evaluate(()=>__astro.getState().loot)).some(l=>l.id==='crystalShard'),'Crystal Golem drops Crystal Shard');
+// M4 quests 6-8 chain: Q6 enter, Q7 golems, Q8 colossus
+await page.evaluate(()=>{__astro.setQuest(7);for(let k=0;k<2;k++){const i=__astro.getState().mobs.findIndex(m=>m.type==='Crystal Golem'&&!m.dead);if(i>=0)__astro.killMob(i);else{const j=__astro.spawnMobAt('Crystal Golem',__astro.getState().pos.x+3,__astro.getState().pos.z+3);__astro.killMob(j)}}});
+assert((await page.evaluate(()=>__astro.getState().quest)).done,'Crystal Hunter quest completes on 2 golem kills');
+// colossus telegraph appears when close
+await page.evaluate(()=>{const s=__astro.getState();__astro.teleport(0,-37)});
+await page.waitForFunction(()=>__astro.getState().caveBoss.telegraph!==null,{timeout:8000});
+const cb=await page.evaluate(()=>{const s=__astro.getState();return {tele:s.caveBoss.telegraph,fields:s.telegraphs}});
+assert(['smash','throw'].includes(cb.tele),`colossus telegraphs (${cb.tele})`);assert(cb.fields>=1,'telegraph field mesh present');
+await page.screenshot({path:'qa/screenshots/cave-boss-907.png'});
+// colossus kill: 300 XP path, Colossus Core + Runic Greatsword drops, endgame modal
+await page.evaluate(()=>{__astro.setQuest(8);const i=__astro.getState().mobs.findIndex(m=>m.type==='Deepstone Colossus');__astro.killMob(i)});
+const post=await page.evaluate(()=>{const s=__astro.getState();return {dead:s.caveBoss.dead,loot:s.loot.map(l=>l.id),quest:s.quest}});
+assert(post.dead,'colossus dies via debug kill');assert(post.loot.includes('colossusCore'),'drops Colossus Core');assert(post.loot.includes('runicSword'),'drops Runic Greatsword');assert(post.quest.done,'The Colossus quest flagged done');
+await page.waitForFunction(()=>document.querySelector('#endgame').classList.contains('open'),{timeout:5000});
+await page.evaluate(()=>document.querySelector('#endgameClose').click());
+// save/reload inside cave restores cave
+await page.reload();await page.waitForFunction(()=>window.__astro);
+assert.equal(await page.evaluate(()=>__astro.getState().map),'cave','reload inside cave restores map=cave');
+await page.evaluate(()=>__astro.teleport(4,32));await page.waitForTimeout(900);
+await page.screenshot({path:'qa/screenshots/cave-907.png'});
+// exitCave returns to vale near entrance
+await page.evaluate(()=>__astro.exitCave());await page.waitForFunction(()=>__astro.getState().map==='vale',{timeout:4000});
+const back=await page.evaluate(()=>__astro.getState().pos);
+assert(Math.hypot(back.x-32,back.z+81)<8,`exitCave returns near entrance (${back.x.toFixed(1)},${back.z.toFixed(1)})`);
 const pixels=await page.screenshot();assert(pixels.length>1000,'canvas screenshot non-empty');assert.equal(errors.length,0,`console errors: ${errors}`);await page.screenshot({path:'qa/screenshots/e2e-907.png'});await browser.close();await new Promise(r=>s.close(r));console.log('e2e passed');
