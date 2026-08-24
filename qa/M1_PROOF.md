@@ -116,3 +116,33 @@ All tests ran against `dist` on the isolated local port `8701`, using `/usr/bin/
 - **Lingering "Quest complete: Crystal Hunter!" text**: this was the HUD `#toast` element — `toast()` scheduled a fixed fade but repeated toasts raced older timeouts (a later `setTimeout` from an earlier toast could be pre-empted, leaving text at opacity 1). Fixed: `toast()` now clears/re-arms a single tracked timeout (fades ≤1.8s < 4s), and `setMap()` force-hides the toast so it never survives map swaps.
 - **Player readability in TPP**: small cool fill point light (`#7fa0d8`, intensity 3, range 9) follows behind the player in cave so the knight reads from the camera side.
 - Re-verified sequentially: `npm run build` ✓, `node tests/e2e.mjs` ✓ (incl. new boss-luminance assertion), `node tests/viewport.mjs` ✓, `node tests/soak.mjs` ✓ (≥30fps). Screenshots `cave-907.png` and `cave-boss-907.png` regenerated with `?debug=1&capture=1`.
+
+## M6 — Marketing kit (covers, videos, submission, zip)
+
+### Cover pipeline
+- `node scripts/capture-hero.mjs` → exit 0 — real in-game renders (hero-shot.png 1800x2000, hero-wide.png 2560x1440): knight posed via new debug hooks `setCameraPose`/`posePlayer`/`rimLight` (capture=1, HUD hidden, warm rim lights).
+- `node scripts/render-marketing.mjs` → exit 0 — cover.html?w=&h= composited: cover-16x9.png (1920x1080), cover-2x3.png (800x1200, vertical layout: title top / hero bottom), cover-1x1.png (800x800). Title only, no other text.
+- `node scripts/check-cover-brightness.mjs` → exit 0 (gate: meanLum>=80, darkFrac<=0.35, meanSat>=0.35):
+  - cover-16x9.png 1920x1080 meanLum=168.6 darkFrac=0.045 meanSat=0.582 → PASS
+  - cover-2x3.png 800x1200 meanLum=173.2 darkFrac=0.015 meanSat=0.573 → PASS
+  - cover-1x1.png 800x800 meanLum=174.4 darkFrac=0.023 meanSat=0.552 → PASS
+
+### Preview videos
+- `node scripts/record-videos.mjs` → exit 0 — Playwright recordVideo bot: village walk → slime/wolf combat with War Cry/Whirlwind/Dash → (landscape) Alpha Wolf boss teaser. Scripted alive gameplay 17.9s (landscape, 3 kills) / 16.8s (portrait, 5 kills); modals suppressed, HUD kept.
+- `bash scripts/build-videos.sh` → exit 0 — 1-frame static cover concat + gameplay, -an, libx264 yuv420p +faststart.
+- `node scripts/verify-video-frames.mjs` → exit 0 — ffprobe proof:
+  - video-landscape.mp4: h264 1920x1080 yuv420p duration=16.533333
+    - t=1s meanLum=144.8 blackFrac=0.007 colors=200 → GAMEPLAY OK
+    - t=8s meanLum=143.4 blackFrac=0.010 colors=202 → GAMEPLAY OK
+    - t=15s meanLum=142.0 blackFrac=0.021 colors=201 → GAMEPLAY OK
+  - video-portrait.mp4: h264 800x1200 yuv420p duration=16.166667
+    - t=1s meanLum=138.7 blackFrac=0.006 colors=186 → GAMEPLAY OK
+    - t=8s meanLum=134.6 blackFrac=0.016 colors=186 → GAMEPLAY OK
+    - t=15s meanLum=124.3 blackFrac=0.012 colors=174 → GAMEPLAY OK
+
+### Submission docs + zip
+- marketing/SUBMISSION.md (full/short description, controls, category Adventure, 10 tags, age 10+/PEGI 12, QA/SDK notes, save=Yes via Data Module) + marketing/TAXONOMY.md.
+- `npm run build` → exit 0 (bundle.js 680.0kb); `cd dist && zip -rq ../aetherblade.zip .` → exit 0 — flat zip: index.html + bundle.js + assets/ (7 files, 4.0M).
+
+### Regression
+- `npm run build` → exit 0; `node tests/e2e.mjs` → exit 0; `node tests/viewport.mjs` → exit 0; `node tests/soak.mjs` → exit 0. (Game-logic change limited to capture-only debug hooks + camPose short-circuit in updateCamera, inert unless setCameraPose is called.)
