@@ -79,3 +79,31 @@ All tests ran against `dist` on the isolated local port `8701`, using `/usr/bin/
 
 - [Shop panel open at Merchant Odessa — 907×510](screenshots/shop-907.png)
 - [Quest HUD "Wolf Pack 0/3" + gold chip in world — 907×510](screenshots/quest-hud-907.png)
+
+---
+
+# Milestone 4 — The Hollow Depths (appended proof)
+
+## Delivered
+
+- **Cave entrance** in the northern rocks at (30, −85): rocky arch of dodecahedron pillars + lintel with a dark portal disc, 7 glowing rune stones (emissive blue), scatter boulders, blue point light (full builds/capture runs), and a floating "The Hollow Depths [E]" HUD label within 14m. Trees/rocks carved out of the clearing. `E` at <5m enters; gated by **quest ≥ 6 (Q5 claimed) OR level ≥ 5** — otherwise toast "Too dangerous — reach level 5". 0.5s fade-to-black transition both ways.
+- **The Hollow Depths map** (~120×120m cavern, separate `cave` THREE.Group; swap = hide vale `world` + sky group, show cave group; single renderer/camera): vertex-colored stone floor with its own `caveHeight` terrain fn and a carved stream channel, enclosing rock wall + ceiling, **90 stalagmites + 90 stalactites (instanced)**, **52 emissive blue/purple crystals (instanced)** clustered around exactly **6 point lights**, underground stream reusing the water shader with a darker deep-blue tint, 14 glowing mushroom clusters, dark-blue fog (14–60), near-zero sun + dim cool hemisphere, and a **warm torch point light following the player**. Exit portal (runed arch, "Return to Emerald Vale [E]") returns to the vale entrance.
+- **Cave mobs (8 + boss)**: 3× **Cave Bat** (proc body/ears/eyes/flapping wings, erratic sine wander + hover, 0.5s dive attack 8 dmg, 25 HP), 3× **Crystal Golem** (chunky crystal-emissive box golem, slow 0.9 m/s, telegraphed 1s ring smash 25 dmg, 120 HP, always drops **Crystal Shard**), 2× reused Skeletons. Map-tagged entities: AI, combat, whirlwind, war cry, labels and loot all filter by active map.
+- **Boss — Deepstone Colossus** (600 HP, far chamber at (0, −42) ringed by rock pillars): **smash** (red AoE ring telegraph 6m, 30 dmg), **rock throw** (dark shadow-circle telegraph at target + arcing rock projectile, 20 dmg), **summons 2 Cave Bats at 50% HP**. Reuses the top boss bar (name swaps per boss). Drops **Colossus Core + Runic Greatsword** (epic, 16/20/28) + 5 coins, 300 XP. Victory: "The Depths are silent..." toast + happytime + END OF CONTENT modal ("You have conquered Emerald Vale and the Hollow Depths — more realms coming soon"); free play continues after closing.
+- **Quests 6–8** (mentor still claims): Q6 *Into the Depths* (enter cave → 80g+120XP), Q7 *Crystal Hunter* (2 Crystal Golems → 120g+180XP), Q8 *The Colossus* (→ 300g+400XP + "Title unlocked: DEPTHBREAKER"). Q5 claim still teases the rumbling entrance.
+- **Persistence**: `map` saved; reloading inside the cave restores the cave (lighting, fog, groups, boss respawned if undefeated). Knock-out inside the cave restores at the cave spawn.
+- **Debug hooks**: `enterCave()`/`exitCave()`; `getState()` exposes `map` ('vale'|'cave'), per-mob `map`/`dead`, per-loot `map`, `telegraphs` count, and `caveBoss {hp,max,dead,telegraph,summoned,dist}`; plus `spawnCaveBoss()`, `setLevel(n)`.
+
+## Required production-build verification (sequential, shared port 8701)
+
+| Command | Exit code | Evidence |
+| --- | ---: | --- |
+| `npm run build` | 0 | bundled production build (665.7kb JS), dist 13M < 20MB |
+| `node tests/e2e.mjs` | 0 | all M1+M2+M3 checks + M4: cave mobs pre-spawned (8), `enterCave(false)` gated below level 5, `enterCave()` switches map + mobs list, Cave Bat 25 HP + Crystal Golem 120 HP, golem debug-kill drops Crystal Shard, Q7 completes on 2 golem kills, colossus telegraphs (smash/throw) with telegraph field mesh ≥1, colossus kill drops Colossus Core + Runic Greatsword and opens the endgame modal, reload inside cave restores map='cave', `exitCave()` returns beside the vale entrance |
+| `node tests/viewport.mjs` | 0 | all 10 viewport dimensions, canvas coverage ≥98% |
+| `node tests/soak.mjs` | 0 | 120s accelerated simulation ≥30fps, particles ≤64, entities bounded (≤28 incl. cave roster) |
+
+## Screenshots
+
+- [Inside the Hollow Depths — crystals, mushrooms, torch light — 907×510](screenshots/cave-907.png)
+- [Deepstone Colossus + boss bar + crystal cavern — 907×510](screenshots/cave-boss-907.png)
