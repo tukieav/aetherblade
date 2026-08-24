@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Aetherblade Cover</title>
+<style>html,body{margin:0;padding:0;background:#000}canvas{display:block}</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<script>
+// Aetherblade cover generator. ?w=&h= selects the format:
+// 1920x1080 (16:9), 800x1200 (2:3 vertical layout), 800x800 (1:1).
+// Composites the REAL in-game render (marketing/hero-shot.png, captured by
+// scripts/capture-hero.mjs) with saturation/brightness grading, warm rim
+// glow, and the chunky AETHERBLADE title. No text besides the title.
+const q = new URLSearchParams(location.search);
+const W = +q.get('w') || 1920, H = +q.get('h') || 1080;
+const cv = document.getElementById('cv');
+cv.width = W; cv.height = H;
+const g = cv.getContext('2d');
+const vertical = H / W >= 1.3; // 2:3 layout: title top, hero center-bottom
+
+const img = new Image();
+img.src = vertical ? 'hero-shot.png' : 'hero-wide.png';
+img.onload = () => { draw(); window.__coverReady = true; };
+img.onerror = () => { drawFallback(); draw(false); window.__coverReady = true; };
+
+function draw(useImg = true) {
+  // 1) Vivid sky/meadow gradient base (matches game palette).
+  const bg = g.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#3fa2ff'); bg.addColorStop(.45, '#8ed0ff');
+  bg.addColorStop(.62, '#b8e88a'); bg.addColorStop(1, '#7ec850');
+  g.fillStyle = bg; g.fillRect(0, 0, W, H);
+
+  if (useImg) {
+    // 2) Real render, cover-fit, focus on the knight (image center ~52%/55%).
+    g.save();
+    g.filter = 'saturate(1.45) brightness(1.12) contrast(1.06)';
+    const iw = img.width, ih = img.height;
+    // In vertical layout leave the top ~30% for the title; hero sits lower.
+    const areaY = vertical ? H * .22 : 0, areaH = vertical ? H * .78 : H;
+    const s = Math.max(W / iw, areaH / ih) * (vertical ? 1.06 : 1.0);
+    const dw = iw * s, dh = ih * s;
+    let dx = W / 2 - dw / 2;
+    // Bottom-anchor so the meadow fills the frame; knight keeps headroom.
+    let dy = H - dh;
+    dx = Math.min(0, Math.max(W - dw, dx));
+    g.drawImage(img, dx, dy, dw, dh);
+    g.restore();
+    if (vertical) { // blend image top edge into the sky
+      const fade = g.createLinearGradient(0, areaY - 2, 0, areaY + H * .14);
+      fade.addColorStop(0, 'rgba(63,162,255,1)'); fade.addColorStop(1, 'rgba(63,162,255,0)');
+      g.fillStyle = fade; g.fillRect(0, 0, W, areaY + H * .15);
+    }
+  }
+
+  // 3) Warm rim-light glow around the hero area.
+  const hx = W / 2, hy = vertical ? H * .62 : H * .58;
+  const glow = g.createRadialGradient(hx, hy, Math.min(W, H) * .12, hx, hy, Math.min(W, H) * .62);
+  glow.addColorStop(0, 'rgba(255,214,140,0.28)');
+  glow.addColorStop(.55, 'rgba(255,190,110,0.10)');
+  glow.addColorStop(1, 'rgba(255,170,80,0)');
+  g.fillStyle = glow; g.fillRect(0, 0, W, H);
+
+  // 4) Soft brightening vignette-in-reverse (keep edges from going dark).
+  g.fillStyle = 'rgba(255,248,225,0.05)'; g.fillRect(0, 0, W, H);
+
+  // 5) Title.
+  title();
+}
+
+function title() {
+  const text = 'AETHERBLADE';
+  let fs = Math.floor(vertical ? W * .148 : Math.min(W * .105, H * .19));
+  const tx = W / 2, ty = vertical ? H * .115 : H * .13;
+  g.save();
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  // Shrink font until the title (plus outline) fits within 90% of the width.
+  do {
+    g.font = `900 ${fs}px 'Arial Black', Arial, sans-serif`;
+    if (g.measureText(text).width + fs * .3 <= W * .9) break;
+    fs -= 2;
+  } while (fs > 20);
+  // Thick dark outline (multi-pass stroke).
+  g.lineJoin = 'round';
+  g.strokeStyle = '#1a2340'; g.lineWidth = fs * .30; g.strokeText(text, tx, ty);
+  g.strokeStyle = '#2a3a68'; g.lineWidth = fs * .16; g.strokeText(text, tx, ty);
+  // Golden gradient fill.
+  const tg = g.createLinearGradient(0, ty - fs / 2, 0, ty + fs / 2);
+  tg.addColorStop(0, '#fff6d8'); tg.addColorStop(.42, '#ffd75e');
+  tg.addColorStop(.72, '#ff9d2e'); tg.addColorStop(1, '#e8781a');
+  g.fillStyle = tg; g.fillText(text, tx, ty);
+  // Top highlight.
+  g.fillStyle = 'rgba(255,255,255,0.35)';
+  g.save(); g.beginPath(); g.rect(0, ty - fs * .5, W, fs * .22); g.clip();
+  g.fillText(text, tx, ty); g.restore();
+  g.restore();
+}
+
+function drawFallback() {
+  // Stylized illustration fallback (no image): knight silhouette in game palette.
+  // (Only used if hero-shot.png is missing.)
+}
+</script>
+</body>
+</html>
