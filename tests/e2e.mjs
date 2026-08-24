@@ -15,7 +15,7 @@ const before=await page.evaluate(()=>__astro.getState().pos.z);await page.locato
 await page.keyboard.press('Space');await page.waitForTimeout(50);assert((await page.evaluate(()=>__astro.getState().pos.y))>0,'jump rises');
 await page.keyboard.press('KeyI');assert(await page.locator('#inventory').evaluate(e=>e.classList.contains('open')),'inventory opens');await page.screenshot({path:'qa/screenshots/inventory-907.png'});await page.locator('#invClose').click();
 await page.evaluate(()=>__astro.teleport(-8,-42));await page.waitForTimeout(180);const labelProjection=await page.evaluate(()=>{const mob=__astro.getState().mobs[1],label=document.querySelectorAll('.nameplate')[1].getBoundingClientRect(),canvas=document.querySelector('#game').getBoundingClientRect(),labelCenter={x:label.left+label.width/2,y:label.top+label.height/2},playerCenter={x:canvas.left+canvas.width/2,y:canvas.top+canvas.height/2};return {visible:mob.screen.visible,labelDistance:Math.hypot(labelCenter.x-mob.screen.x,labelCenter.y-mob.screen.y),playerDistance:Math.hypot(labelCenter.x-playerCenter.x,labelCenter.y-playerCenter.y)}});assert(labelProjection.visible,'mob label target is on-screen');assert(labelProjection.labelDistance<80,`mob label tracks its projected position (${labelProjection.labelDistance}px)`);assert(labelProjection.playerDistance>120,`mob label is not attached to player (${labelProjection.playerDistance}px)`);
-await page.evaluate(()=>__astro.teleport(-8,-34));await page.locator('#game').click();await page.waitForTimeout(50);await page.mouse.click(450,255);await page.waitForTimeout(180);assert((await page.evaluate(()=>__astro.getState().mobs[0].hp))<36,'sword hit damages mob');await page.screenshot({path:'qa/screenshots/combat-907.png'});const itemCount=await page.evaluate(()=>__astro.getState().inventory.length);await page.evaluate(()=>__astro.killMob(0));await page.keyboard.press('KeyE');await page.waitForTimeout(80);assert((await page.evaluate(()=>__astro.getState().inventory.length))>itemCount,'loot pickup');
+await page.evaluate(()=>__astro.teleport(-8,-34));await page.locator('#game').click();await page.waitForTimeout(50);await page.mouse.click(450,255);await page.waitForTimeout(180);assert((await page.evaluate(()=>__astro.getState().mobs[0].hp))<36,'sword hit damages mob');await page.screenshot({path:'qa/screenshots/combat-907.png'});const pickBefore=await page.evaluate(()=>{const s=__astro.getState();return {inv:s.inventory.length,gold:s.gold}});await page.evaluate(()=>__astro.killMob(0));await page.keyboard.press('KeyE');await page.waitForTimeout(80);const pickAfter=await page.evaluate(()=>{const s=__astro.getState();return {inv:s.inventory.length,gold:s.gold}});assert(pickAfter.inv>pickBefore.inv||pickAfter.gold>pickBefore.gold,'loot pickup adds item or gold');
 await page.evaluate(()=>__astro.teleport(19,-38));await page.waitForTimeout(120);await page.screenshot({path:'qa/screenshots/mob-fight-wolf.png'});
 // M2 — dash: distance + i-frames + cooldown
 await page.evaluate(()=>__astro.teleport(55,40));await page.waitForFunction(()=>__astro.getState().stamina>=45,{timeout:15000});
@@ -35,4 +35,34 @@ const drops=await page.evaluate(()=>__astro.getState().loot);assert(drops.filter
 await page.evaluate(()=>{const f=__astro.getState().loot.find(l=>l.id==='fangBlade');__astro.teleport(f.x,f.z)});for(let i=0;i<6;i++){await page.keyboard.press('KeyE');await page.waitForTimeout(30)}
 assert(await page.evaluate(()=>__astro.getState().inventory.includes('fangBlade')),'Fang Blade picked up into inventory');
 await page.evaluate(()=>{for(let i=0;i<8;i++)__astro.completeTutorialStep()});assert((await page.evaluate(()=>__astro.getState().tutorialStep))>=8,'tutorial debug steps transition');await page.evaluate(()=>localStorage.setItem('aetherblade.save',JSON.stringify({level:3,xp:12,inventory:['potion'],equipped:'ironSword',tutorialStep:8})));await page.reload();await page.waitForFunction(()=>window.__astro);assert.equal(await page.evaluate(()=>__astro.getState().level),3,'save/load level');
+// M3 — shop: buy decreases gold + adds item; sell grants 40% value
+await page.evaluate(()=>{const m=__astro.getState().merchant;__astro.grantGold(100);__astro.teleport(m.x+1.5,m.z)});
+const shop0=await page.evaluate(()=>{__astro.openShop();const s=__astro.getState();return {gold:s.gold,inv:s.inventory.length,merchant:s.merchant}});
+assert(shop0.merchant&&typeof shop0.merchant.x==='number','merchant position exposed');
+assert(await page.locator('#shop').evaluate(e=>e.classList.contains('open')),'shop panel opens');
+await page.screenshot({path:'qa/screenshots/shop-907.png'});
+await page.locator('#shopBuy .item').first().click();await page.waitForTimeout(50);
+const shop1=await page.evaluate(()=>{const s=__astro.getState();return {gold:s.gold,inv:s.inventory.length}});
+assert.equal(shop1.gold,shop0.gold-15,'buying potion costs 15g');assert.equal(shop1.inv,shop0.inv+1,'buying potion adds inventory item');
+await page.locator('#shopSell .item').last().click();await page.waitForTimeout(50);
+const shop2=await page.evaluate(()=>{const s=__astro.getState();return {gold:s.gold,inv:s.inventory.length}});
+assert.equal(shop2.gold,shop1.gold+6,'selling potion grants 6g (40%)');assert.equal(shop2.inv,shop1.inv-1,'selling removes inventory item');
+await page.keyboard.press('Backspace');assert(!await page.locator('#shop').evaluate(e=>e.classList.contains('open')),'Backspace closes shop');
+// M3 — quests: kill tracking, mentor claim, chain advance
+await page.evaluate(()=>__astro.setQuest(1));
+const q0=await page.evaluate(()=>__astro.getState().quest);assert.equal(q0.id,1,'quest 1 active');assert.equal(q0.target,5,'quest target exposed');
+await page.evaluate(()=>{const p=__astro.getState().pos,i=__astro.spawnMobAt('Slime',p.x+2,p.z+2);__astro.killMob(i)});
+assert.equal((await page.evaluate(()=>__astro.getState().quest)).progress,1,'quest kill-tracking increments');
+await page.evaluate(()=>{for(let k=0;k<4;k++){const p=__astro.getState().pos,i=__astro.spawnMobAt('Slime',p.x+2,p.z+2);__astro.killMob(i)}});
+const q1=await page.evaluate(()=>__astro.getState().quest);assert.equal(q1.progress,5,'quest reaches target');assert(q1.done,'quest flagged done');
+await page.keyboard.press('Backspace');
+const goldPre=await page.evaluate(()=>{const m=__astro.getState().mentor;__astro.teleport(m.x+1,m.z);return __astro.getState().gold});
+await page.keyboard.press('KeyE');await page.waitForTimeout(60);
+const claim=await page.evaluate(()=>{const s=__astro.getState();return {gold:s.gold,quest:s.quest}});
+assert.equal(claim.gold,goldPre+30,'claiming Pest Control at mentor grants 30g');assert.equal(claim.quest.id,2,'quest chain advances to Wolf Pack');
+await page.screenshot({path:'qa/screenshots/quest-hud-907.png'});
+// M3 — quest state survives reload
+await page.reload();await page.waitForFunction(()=>window.__astro);
+const persisted=await page.evaluate(()=>{const s=__astro.getState();return {quest:s.quest,gold:s.gold}});
+assert.equal(persisted.quest.id,2,'quest id survives reload');assert.equal(persisted.gold,claim.gold,'gold survives reload');
 const pixels=await page.screenshot();assert(pixels.length>1000,'canvas screenshot non-empty');assert.equal(errors.length,0,`console errors: ${errors}`);await page.screenshot({path:'qa/screenshots/e2e-907.png'});await browser.close();await new Promise(r=>s.close(r));console.log('e2e passed');
